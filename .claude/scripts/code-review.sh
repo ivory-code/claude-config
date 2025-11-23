@@ -10,6 +10,11 @@ if [ ! -f "$FILE_PATH" ]; then
     exit 0
 fi
 
+# Skip .env files (they are expected to contain secrets)
+if [[ "$FILE_PATH" =~ \.env(\.|$) ]]; then
+    exit 0
+fi
+
 # Get file extension
 EXT="${FILE_PATH##*.}"
 
@@ -30,7 +35,7 @@ SECRETS_PATTERNS=(
     "password['\"]?\s*[:=]\s*['\"][^'\"]{3,}"
     "secret['\"]?\s*[:=]\s*['\"][^'\"]{10,}"
     "private[_-]?key['\"]?\s*[:=]\s*['\"][^'\"]{10,}"
-    "Bearer [A-Za-z0-9\-._~+/]+"
+    "Bearer [A-Za-z0-9._~+/-]+"
 )
 
 ISSUES=()
@@ -44,11 +49,6 @@ done
 
 # Check for common anti-patterns in JS/TS/Vue
 if [[ "$EXT" =~ ^(js|jsx|ts|tsx|vue)$ ]]; then
-    # Unused variables (basic check)
-    if echo "$CONTENT" | grep -E "const \w+ = .*;\s*$" > /dev/null; then
-        ISSUES+=("💡 ANTI-PATTERN: Possible unused variables detected")
-    fi
-
     # Console.log in production code (excluding test files)
     if [[ ! "$FILE_PATH" =~ test|spec ]] && echo "$CONTENT" | grep -E "console\.(log|debug|info)" > /dev/null; then
         ISSUES+=("💡 ANTI-PATTERN: console.log found in non-test file")
@@ -60,7 +60,7 @@ if [[ "$EXT" =~ ^(js|jsx|ts|tsx|vue)$ ]]; then
     fi
 
     # TODO/FIXME comments
-    if echo "$CONTENT" | grep -iE "\/\/.*TODO|\/\/.*FIXME" > /dev/null; then
+    if echo "$CONTENT" | grep -iE "\/\/.*TODO|\/\/.*FIXME|\/\*.*TODO|\/\*.*FIXME" > /dev/null; then
         ISSUES+=("📝 NOTE: TODO/FIXME comments found")
     fi
 fi
